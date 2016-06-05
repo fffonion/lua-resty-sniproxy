@@ -17,9 +17,9 @@ Table of Contents
 Description
 ===========
 
-This library is a [SNI](https://zh.wikipedia.org/wiki/%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%90%8D%E7%A7%B0%E6%8C%87%E7%A4%BA) written in Lua. TLS parsing part is rewritten from [dlundquist/sniproxy](https://github.com/dlundquist/sniproxy)
+This library is an [SNI](https://en.wikipedia.org/wiki/Server_Name_Indication) proxy written in Lua. TLS parsing part is rewritten from [dlundquist/sniproxy](https://github.com/dlundquist/sniproxy)
 
-Note that [ngx_stream_lua_module](https://github.com/openresty/stream-lua-nginx-module) is required.
+Note that nginx [stream module](https://nginx.org/en/docs/stream/ngx_stream_core_module.html) and [ngx_stream_lua_module](https://github.com/openresty/stream-lua-nginx-module) is required.
 
 Tested on Openresty 1.9.15.1.
 
@@ -60,11 +60,13 @@ stream {
 
 A Lua table `sni_rules` should be defined in the `init_worker_by_lua_block` directive.
 
-The key can be either whole host name or regular expression. Use `.` for a default host name.
+The key can be either whole host name or regular expression. Use `.` for a default host name. If no entry is matched, connection will be closed.
 
 The value is a table containing host name and port. If host is set to `nil`, the server_name in SNI will be used. If the port is not defined or set to `nil`, **443** will be used.
 
 Rules are applied with the priority as its occurrence sequence in the table. In the example above, **twitter.com** will match the third rule rather than the fourth.
+
+If the protocol version is less than TLSv1 (eg. SSLv3, SSLv2), connection will be closed, since SNI extension is not supported in these versions.
 
 [Back to TOC](#table-of-contents)
 
