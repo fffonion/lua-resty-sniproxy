@@ -22,7 +22,7 @@ _M._VERSION = '0.01'
 
 local mt = { __index = _M }
 
-function _M.new(self, timeout)
+function _M.new(self, bufsize, timeout)
     local srvsock, err = tcp()
     if not srvsock then
         return nil, err
@@ -36,6 +36,7 @@ function _M.new(self, timeout)
         reqsock = reqsock,
         exit_flag = false,
         server_name = nil,
+        bufsize = bufsize or 1024,
         timeout = timeout or 30000
     }, mt)
 end
@@ -214,43 +215,47 @@ end
 local function _upl(self)
     -- proxy client request to server
     local buf, len, _
+    local rsock = self.reqsock
+    local ssock = self.srvsock
     while not self.exit_flag do
         if self.reqsock == nil then
             break
         end
-        hd, _ = self.reqsock:receive(5)
+        hd, _ = rsock:receive(5)
         if hd == nil then
             break
         end
         len = bit.lshift(byte(hd, 4), 8) + byte(hd, 5)
-        buf, _ = self.reqsock:receive(len)
+        buf, _ = rsock:receive(len)
         if self.srvsock == nil then
             break
         end
-        self.srvsock:send(hd)
-        self.srvsock:send(buf)
+        ssock:send(hd)
+        ssock:send(buf)
     end
     self.exit_flag = true
 end
 
 local function _dwn(self)
     -- proxy response to client
-    local buf, _
+    local buf, _, __
+    local rsock = self.reqsock
+    local ssock = self.srvsock
     while not self.exit_flag do
-        if self.srvsock == nil then
+        --[[if self.srvsock == nil then
+            break
+        end]]--
+        hd, _, __ = ssock:receive(5)
+        if _ then
             break
         end
-        hd, _ = self.srvsock:receive(5)
-        if hd == nil then
-            break
-        end
+        rsock:send(hd)
         len = bit.lshift(byte(hd, 4), 8) + byte(hd, 5)
-        buf, _ = self.srvsock:receive(len)
-        if self.reqsock == nil then
+        buf, _ = ssock:receive(len)
+        --[[if self.reqsock == nil then
             break
-        end
-        self.reqsock:send(hd)
-        self.reqsock:send(buf)
+        end]]--
+        rsock:send(buf)
     end
     self.exit_flag = true
 end
