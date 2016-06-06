@@ -9,6 +9,12 @@ local spawn = ngx.thread.spawn
 local wait = ngx.thread.wait
 
 local bit = require("bit")
+local lshift = bit.lshift
+
+local TLS_HEADER_LEN = 5
+local TLS_HANDSHAKE_CONTENT_TYPE = 0x16
+local TLS_HANDSHAKE_TYPE_CLIENT_HELLO = 0x01
+local TLS_HEADER_MAX_LENGHTH = 2048 -- anti dos attack
 
 
 local ok, new_tab = pcall(require, "table.new")
@@ -60,12 +66,7 @@ end
 
 local function _parse_tls_header(self, dt_record, pos, data_len, hostname)
     -- https://github.com/dlundquist/sniproxy/blob/master/src/tls.c
-    local TLS_HEADER_LEN = 5
-    local TLS_HANDSHAKE_CONTENT_TYPE = 0x16
-    local TLS_HANDSHAKE_TYPE_CLIENT_HELLO = 0x01
-    
-    local TLS_HEADER_MAX_LENGHTH = 2048
-    
+
     local dt_overhead, err = self.reqsock:receive(TLS_HEADER_LEN)
     
     -- parse TLS header starts
@@ -91,10 +92,10 @@ local function _parse_tls_header(self, dt_record, pos, data_len, hostname)
     end
 
     -- protocol: TLS record length 
-    local data_len = bit.lshift(byte(dt_overhead, 4), 8) + byte(dt_overhead, 5)
+    local data_len = lshift(byte(dt_overhead, 4), 8) + byte(dt_overhead, 5)
     
     if data_len > TLS_HEADER_MAX_LENGHTH then
-        ngx.log(ngx.INFO, "TLS ClientHello exceeds max length configured", data_len, ">", TLS_HEADER_MAX_LENGHTH)
+        ngx.log(ngx.WARN, "TLS ClientHello exceeds max length configured", data_len, ">", TLS_HEADER_MAX_LENGHTH)
         return -5
     end
 
@@ -132,7 +133,7 @@ local function _parse_tls_header(self, dt_record, pos, data_len, hostname)
     if (pos > data_len) then
         return -5
     end
-    len = bit.lshift(byte(dt_record, pos), 8) + byte(dt_record, pos + 1)
+    len = lshift(byte(dt_record, pos), 8) + byte(dt_record, pos + 1)
     pos = pos + 2 + len;
 
     -- protocol: Compression Methods
@@ -151,7 +152,7 @@ local function _parse_tls_header(self, dt_record, pos, data_len, hostname)
     if (pos + 1 > data_len) then
         return -5
     end
-    len = bit.lshift(byte(dt_record, pos), 8) + byte(dt_record, pos + 1)
+    len = lshift(byte(dt_record, pos), 8) + byte(dt_record, pos + 1)
     pos = pos + 2;
 
     
@@ -164,7 +165,7 @@ local function _parse_tls_header(self, dt_record, pos, data_len, hostname)
 
     while (pos + 3 <= data_len) do
         -- Extension Length */
-        len = bit.lshift(byte(dt_record, pos + 2), 8) + byte(dt_record, pos + 3)
+        len = lshift(byte(dt_record, pos + 2), 8) + byte(dt_record, pos + 3)
         
         -- Check if it's a server name extension */
         if (byte(dt_record, pos) == 0 and byte(dt_record, pos + 1) == 0) then
@@ -178,7 +179,7 @@ local function _parse_tls_header(self, dt_record, pos, data_len, hostname)
             -- starts parse server name extension
             while (pos + 3 < data_len) do
                 ngx.log(ngx.INFO, "pos is now", string.format("0x%0X", pos-1))
-                len = bit.lshift(byte(dt_record, pos + 1), 8) + byte(dt_record, pos + 2)
+                len = lshift(byte(dt_record, pos + 1), 8) + byte(dt_record, pos + 2)
                 
                 if (pos + 2 + len > data_len) then
                     return -5
@@ -225,7 +226,7 @@ local function _upl(self)
         if hd == nil then
             break
         end
-        len = bit.lshift(byte(hd, 4), 8) + byte(hd, 5)
+        len = lshift(byte(hd, 4), 8) + byte(hd, 5)
         buf, _ = rsock:receive(len)
         if self.srvsock == nil then
             break
@@ -250,7 +251,7 @@ local function _dwn(self)
             break
         end
         rsock:send(hd)
-        len = bit.lshift(byte(hd, 4), 8) + byte(hd, 5)
+        len = lshift(byte(hd, 4), 8) + byte(hd, 5)
         buf, _ = ssock:receive(len)
         --[[if self.reqsock == nil then
             break
