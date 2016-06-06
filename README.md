@@ -41,8 +41,9 @@ stream {
         sni_rules = { 
             ["www.google.com"] = {"www.google.com", 443},
             ["www.facebook.com"] = {"9.8.7.6", 443},
-            ["twitter.com"] = {"1.2.3.4"},
-            [".+.twitter.com"] = {nil, 443}
+            ["api.twitter.com"] = {"1.2.3.4"},
+            [".+.twitter.com"] = {nil, 443},
+            ["."] = {"unix:/var/run/nginx-default.sock"}
         }   
     }
 
@@ -62,9 +63,9 @@ A Lua table `sni_rules` should be defined in the `init_worker_by_lua_block` dire
 
 The key can be either whole host name or regular expression. Use `.` for a default host name. If no entry is matched, connection will be closed.
 
-The value is a table containing host name and port. If host is set to `nil`, the server_name in SNI will be used. If the port is not defined or set to `nil`, **443** will be used.
+The value is a table containing host name and port. A host can be DNS name, IP address and UNIX domain socket path. If host is set to `nil`, the server_name in SNI will be used. If the port is not defined or set to `nil`, **443** will be used.
 
-Rules are applied with the priority as its occurrence sequence in the table. In the example above, **twitter.com** will match the third rule rather than the fourth.
+Rules are applied with the priority as its occurrence sequence in the table. In the example above, **api.twitter.com** will match the third rule **api.twitter.com** rather than the fourth **.+.twitter.com**.
 
 If the protocol version is less than TLSv1 (eg. SSLv3, SSLv2), connection will be closed, since SNI extension is not supported in these versions.
 
