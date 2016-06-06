@@ -33,17 +33,19 @@ function _M.new(self, bufsize, timeout)
     if not srvsock then
         return nil, err
     end
+    --srvsock:settimeout(timeout or 10000)
+    
     local reqsock, err = ngx.req.socket()
     if not reqsock then
         return nil, err
     end
+    --reqsock:settimeout(timeout or 10000)
     return setmetatable({
         srvsock = srvsock,
         reqsock = reqsock,
         exit_flag = false,
         server_name = nil,
-        bufsize = bufsize or 1024,
-        timeout = timeout or 30000
+        bufsize = bufsize or 1024
     }, mt)
 end
 
@@ -215,50 +217,50 @@ end
 
 local function _upl(self)
     -- proxy client request to server
-    local buf, len, _
+    local buf, len, err, hd, _
     local rsock = self.reqsock
     local ssock = self.srvsock
-    while not self.exit_flag do
-        if self.reqsock == nil then
-            break
-        end
-        hd, _ = rsock:receive(5)
+    while true do
+        hd = rsock:receive(5)
         if hd == nil then
             break
         end
         len = lshift(byte(hd, 4), 8) + byte(hd, 5)
-        buf, _ = rsock:receive(len)
-        if self.srvsock == nil then
+        buf = rsock:receive(len)
+        if buf == nil then
             break
         end
+        
         ssock:send(hd)
-        ssock:send(buf)
+        _, err = ssock:send(buf)
+        if err then
+            break
+        end
     end
-    self.exit_flag = true
 end
 
 local function _dwn(self)
     -- proxy response to client
-    local buf, _, __
+    local buf, len, err, hd, _
     local rsock = self.reqsock
     local ssock = self.srvsock
-    while not self.exit_flag do
-        --[[if self.srvsock == nil then
-            break
-        end]]--
-        hd, _, __ = ssock:receive(5)
-        if _ then
+    while true do
+        hd = ssock:receive(5)
+        if hd == nil then
             break
         end
-        rsock:send(hd)
         len = lshift(byte(hd, 4), 8) + byte(hd, 5)
-        buf, _ = ssock:receive(len)
-        --[[if self.reqsock == nil then
+        buf = ssock:receive(len)
+        if buf == nil then
             break
-        end]]--
-        rsock:send(buf)
+        end
+        
+        rsock:send(hd)
+        _, err = rsock:send(buf)
+        if err then
+            break
+        end
     end
-    self.exit_flag = true
 end
 
 function _M.run(self)
