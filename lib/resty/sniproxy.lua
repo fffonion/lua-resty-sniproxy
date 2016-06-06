@@ -275,7 +275,7 @@ function _M.run(self)
         ngx.log(ngx.INFO, format("tls server_name:%s exit:%d", self.server_name, code))
         local upstream, port
         for k, v in pairs(sni_rules) do
-            local m, e = ngx.re.match(self.server_name, k)
+            local m, e = ngx.re.match(self.server_name, k, "jo")
             if m then
                 upstream = v[1] or self.server_name
                 port = v[2] or 443
