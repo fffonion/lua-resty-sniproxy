@@ -23,7 +23,7 @@ if not ok or type(new_tab) ~= "function" then
 end
 
 
-local _M = new_tab(0, 100)
+local _M = new_tab(0, 20)
 _M._VERSION = '0.01'
 
 local mt = { __index = _M }
@@ -212,7 +212,7 @@ local function _parse_tls_header(self, dt_record, pos, data_len, hostname)
         return -5;
     ]]--
 
-    return 0
+    return 0, dt_overhead, dt_record
 end
 
 local function _upl(self)
@@ -276,6 +276,9 @@ function _M.run(self)
         end
         ngx.log(ngx.INFO, format("tls server_name:%s exit:%d", self.server_name, code))
         local upstream, port
+		if self.server_name == nil then -- no sni extension, only match default rule
+			self.server_name = "."
+		end
         for k, v in pairs(sni_rules) do
             local m, e = ngx.re.match(self.server_name, k, "jo")
             if m then
