@@ -39,11 +39,11 @@ stream {
     lua_resolver 8.8.8.8;
     init_worker_by_lua_block {
         sni_rules = { 
-            ["www.google.com"] = {"www.google.com", 443},
-            ["www.facebook.com"] = {"9.8.7.6", 443},
-            ["api.twitter.com"] = {"1.2.3.4"},
-            [".+.twitter.com"] = {nil, 443},
-            ["."] = {"unix:/var/run/nginx-default.sock"}
+            {"www.google.com", "www.google.com", 443},
+            {"www.facebook.com", "9.8.7.6", 443},
+            {"api.twitter.com", "1.2.3.4"},
+            {".+.twitter.com", nil, 443},
+            {".", "unix:/var/run/nginx-default.sock"}
         }   
     }
 
@@ -59,11 +59,11 @@ stream {
 }
 ```
 
-A Lua table `sni_rules` should be defined in the `init_worker_by_lua_block` directive.
+A Lua array table `sni_rules` should be defined in the `init_worker_by_lua_block` directive.
 
-The key can be either whole host name or regular expression. Use `.` for a default host name. If no entry is matched, connection will be closed.
+The first value can be either whole host name or regular expression. Use `.` for a default host name. If no entry is matched, connection will be closed.
 
-The value is a table containing host name and port. A host can be DNS name, IP address and UNIX domain socket path. If host is set to `nil`, the server_name in SNI will be used. If the port is not defined or set to `nil`, **443** will be used.
+The second and third values are target host name and port. A host can be DNS name, IP address or UNIX domain socket path. If host is not defined or set to `nil`, **server_name** in SNI will be used. If the port is not defined or set to `nil` , **443** will be used.
 
 Rules are applied with the priority as its occurrence sequence in the table. In the example above, **api.twitter.com** will match the third rule **api.twitter.com** rather than the fourth **.+.twitter.com**.
 

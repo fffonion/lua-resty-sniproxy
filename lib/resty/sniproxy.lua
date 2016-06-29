@@ -276,14 +276,14 @@ function _M.run(self)
         end
         ngx.log(ngx.INFO, format("tls server_name:%s exit:%d", self.server_name, code))
         local upstream, port
-		if self.server_name == nil then -- no sni extension, only match default rule
-			self.server_name = "."
-		end
-        for k, v in pairs(sni_rules) do
-            local m, e = ngx.re.match(self.server_name, k, "jo")
+        if self.server_name == nil then -- no sni extension, only match default rule
+            self.server_name = "."
+        end
+        for _, v in pairs(sni_rules) do
+            local m, e = ngx.re.match(self.server_name, v[1], "jo")
             if m then
-                upstream = v[1] or self.server_name
-                port = v[2] or 443
+                upstream = v[2] or self.server_name
+                port = v[3] or 443
                 break
             end
         end
