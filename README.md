@@ -21,7 +21,7 @@ This library is an [SNI](https://en.wikipedia.org/wiki/Server_Name_Indication) p
 
 Note that nginx [stream module](https://nginx.org/en/docs/stream/ngx_stream_core_module.html) and [ngx_stream_lua_module](https://github.com/openresty/stream-lua-nginx-module) is required.
 
-Tested on Openresty 1.9.15.1.
+Tested on Openresty >= 1.9.15.1.
 
 [Back to TOC](#table-of-contents)
 
@@ -103,5 +103,6 @@ See Also
 ========
 * the ngx_stream_lua_module: https://github.com/openresty/stream-lua-nginx-module
 * [dlundquist/sniproxy] (https://github.com/dlundquist/sniproxy)
+* [ngx_stream_ssl_preread_module] (https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html) is available since Nginx 1.11.5 as an alternative to this module.
 
 [Back to TOC](#table-of-contents)
