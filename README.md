@@ -36,7 +36,6 @@ Synopsis
 
 ```
 stream {
-    lua_resolver 8.8.8.8;
     init_worker_by_lua_block {
         sni_rules = { 
             {"www.google.com", "www.google.com", 443},
@@ -50,6 +49,9 @@ stream {
     server {
             error_log /var/log/nginx/sniproxy-error.log error;
             listen 443;
+            
+            resolver 8.8.8.8;
+            
             content_by_lua_block {
                     local sni = require("resty.sniproxy")
                     local sp = sni:new()
