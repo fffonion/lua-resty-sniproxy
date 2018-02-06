@@ -23,8 +23,9 @@ if not ok or type(new_tab) ~= "function" then
 end
 
 
-local _M = new_tab(0, 20)
-_M._VERSION = '0.01'
+local _M = new_tab(0, 4)
+_M._VERSION = '0.02'
+_M.rules = {}
 
 local mt = { __index = _M }
 
@@ -264,8 +265,8 @@ local function _dwn(self)
 end
 
 function _M.run(self)
-    if sni_rules == nil then
-        ngx.log(ngx.ERR, "sni_rules not defined")
+    if _M.rules == nil then
+        ngx.log(ngx.ERR, "sni rules not defined")
         return
     end
     while true do
@@ -279,7 +280,7 @@ function _M.run(self)
         if self.server_name == nil then -- no sni extension, only match default rule
             self.server_name = "."
         end
-        for _, v in pairs(sni_rules) do
+        for _, v in pairs(_M.rules) do
             local m, e = ngx.re.match(self.server_name, v[1], "jo")
             if m then
                 upstream = v[2] or self.server_name

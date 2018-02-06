@@ -36,8 +36,9 @@ Synopsis
 
 ```
 stream {
-    init_worker_by_lua_block {
-        sni_rules = { 
+    init_by_lua_block {
+        local sni = require("resty.sniproxy")
+        sni.rules = { 
             {"www.google.com", "www.google.com", 443},
             {"www.facebook.com", "9.8.7.6", 443},
             {"api.twitter.com", "1.2.3.4"},
