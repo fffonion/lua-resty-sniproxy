@@ -25,7 +25,7 @@ end
 
 local _M = new_tab(0, 4)
 _M._VERSION = '0.02'
-_M.rules = {}
+_M.rules = nil
 
 local mt = { __index = _M }
 
