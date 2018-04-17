@@ -29,39 +29,54 @@ _M.rules = nil
 
 local mt = { __index = _M }
 
-function _M.new(self, bufsize, timeout)
+function _M.new(self, bufsize, connect_timeout, send_timeout, read_timeout)
     local srvsock, err = tcp()
     if not srvsock then
         return nil, err
     end
-    --srvsock:settimeout(timeout or 10000)
-    
+    srvsock:settimeouts(connect_timeout or 10000, send_timeout or 10000, read_timeout or 10000)
+
     local reqsock, err = ngx.req.socket()
     if not reqsock then
         return nil, err
     end
-    --reqsock:settimeout(timeout or 10000)
+    reqsock:settimeouts(connect_timeout or 10000, send_timeout or 10000, read_timeout or 10000)
+
     return setmetatable({
         srvsock = srvsock,
         reqsock = reqsock,
-        exit_flag = false,
         server_name = nil,
         bufsize = bufsize or 1024
     }, mt)
 end
 
 local function _cleanup(self)
-    if self.srvsock ~= nil then
-        local ok, err = self.srvsock:close()
-        if not ok then
-            --
+    -- make sure buffers are clean
+    ngx.flush(true)
+
+    local srvsock = self.srvsock
+    local reqsock = self.reqsock
+    if srvsock ~= nil then
+        if srvsock.shutdown then
+            srvsock:shutdown("send")
+        end
+        if srvsock.close ~= nil then
+            local ok, err = srvsock:setkeepalive()
+            if not ok then
+                --
+            end
         end
     end
     
-    if self.reqsock ~= nil and self.reqsock.close ~= nil then
-        local ok, err = self.reqsock:close()
-        if not ok then
-            --
+    if reqsock ~= nil then
+        if reqsock.shutdown then
+            reqsock:shutdown("send")
+        end
+        if reqsock.close ~= nil then
+            local ok, err = reqsock:close()
+            if not ok then
+                --
+            end
         end
     end
     
@@ -218,7 +233,7 @@ end
 
 local function _upl(self)
     -- proxy client request to server
-    local buf, len, err, hd, _
+    local buf, len, err, hd
     local rsock = self.reqsock
     local ssock = self.srvsock
     while true do
@@ -242,7 +257,7 @@ end
 
 local function _dwn(self)
     -- proxy response to client
-    local buf, len, err, hd, _
+    local buf, len, err, hd
     local rsock = self.reqsock
     local ssock = self.srvsock
     while true do
@@ -302,10 +317,10 @@ function _M.run(self)
         self.srvsock:send(dt1)
         self.srvsock:send(dt2)
         
-        wait(
-            spawn(_upl, self),
-            spawn(_dwn, self)
-        )
+        local co_upl = spawn(_upl, self)
+        local co_dwn = spawn(_dwn, self)
+        wait(co_upl)
+        wait(co_dwn)
         
         break
     end
