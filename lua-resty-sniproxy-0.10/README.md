@@ -49,6 +49,7 @@ stream {
 
     # for OpenResty >= 1.13.6.1, native Nginx proxying
     lua_add_variable $sniproxy_upstream;
+    lua_add_variable $sniproxy_port;
     server {
             error_log /var/log/nginx/sniproxy-error.log error;
             listen 443;
@@ -60,7 +61,7 @@ stream {
                     local sp = sni:new()
                     sp:preread_by()
             }
-            proxy_pass $sniproxy_upstream;
+            proxy_pass $sniproxy_upstream:$sniproxy_port;
     }
 
     # for OpenResty < 1.13.6.1, Lua land proxying

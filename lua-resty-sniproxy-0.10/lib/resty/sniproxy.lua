@@ -26,7 +26,7 @@ end
 
 
 local _M = new_tab(0, 4)
-_M._VERSION = '0.11'
+_M._VERSION = '0.10'
 _M.rules = nil
 
 local mt = { __index = _M }
@@ -255,11 +255,9 @@ function _M.preread_by(self)
     ngx.log(ngx.INFO, "tls server_name: ", server_name)
 
     local upstream, port = _select_upstream(server_name)
-    if upstream:sub(1, 5) ~= "unix:" then
-        upstream = upstream .. ":" .. tostring(port)
-    end
-    ngx.log(ngx.INFO, "selecting upstream: ", upstream)
+    ngx.log(ngx.INFO, "selecting upstream: ", upstream, ":", port)
     ngx.var.sniproxy_upstream = upstream
+    ngx.var.sniproxy_port = port
 end
 
 
