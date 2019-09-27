@@ -47,17 +47,35 @@ stream {
         }   
     }
 
+    # for OpenResty >= 1.13.6.1, native Nginx proxying
+    lua_add_variable $sniproxy_upstream;
+    lua_add_variable $sniproxy_port;
     server {
             error_log /var/log/nginx/sniproxy-error.log error;
             listen 443;
-            
+
             resolver 8.8.8.8;
-            
+
+            prepread_by_lua_block {
+                    local sni = require("resty.sniproxy")
+                    local sp = sni:new()
+                    sp:preread_by()
+            }
+            proxy_pass $sniproxy_upstream:$sniproxy_port;
+    }
+
+    # for OpenResty < 1.13.6.1, Lua land proxying
+    server {
+            error_log /var/log/nginx/sniproxy-error.log error;
+            listen 443;
+
+            resolver 8.8.8.8;
+
             content_by_lua_block {
                     local sni = require("resty.sniproxy")
                     local sp = sni:new()
-                    sp:run()
-            }   
+                    sp:content_by()
+            }
     }
 }
 ```
