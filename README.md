@@ -43,6 +43,10 @@ stream {
             {"www.facebook.com", "9.8.7.6", 443},
             {"api.twitter.com", "1.2.3.4"},
             {".+.twitter.com", nil, 443},
+            -- to activate this rule, you must use Lua land proxying
+            -- {"some.service.svc", "unix:/var/run/nginx-proxy-proto.sock", nil, sni.SNI_PROXY_PROTOCOL_UPSTREAM},
+            -- {"some2.service.svc", "unix:/var/run/nginx-proxy-proto.sock", nil,
+            --                            sni.SNI_PROXY_PROTOCOL_UPSTREAM + sni.SNI_PROXY_PROTOCOL},
             {".", "unix:/var/run/nginx-default.sock"}
         }   
     }
@@ -63,7 +67,7 @@ stream {
             proxy_pass $sniproxy_upstream;
     }
 
-    # for OpenResty < 1.13.6.1, Lua land proxying
+    # for OpenResty < 1.13.6.1 or `flags` are configured, Lua land proxying
     server {
             error_log /var/log/nginx/sniproxy-error.log error;
             listen 443;
@@ -84,6 +88,16 @@ A Lua array table `sni_rules` should be defined in the `init_worker_by_lua_block
 The first value can be either whole host name or regular expression. Use `.` for a default host name. If no entry is matched, connection will be closed.
 
 The second and third values are target host name and port. A host can be DNS name, IP address or UNIX domain socket path. If host is not defined or set to `nil`, **server_name** in SNI will be used. If the port is not defined or set to `nil` , **443** will be used.
+
+The forth value is the flags to use. Available flags are:
+
+
+        sni.SNI_PROXY_PROTOCOL -- use client address received from proxy protocol to send to upstream
+        sni.SNI_PROXY_PROTOCOL_UPSTREAM -- send proxy protocol v1 handshake to upstream
+
+
+To use flags, the server must be configured to do **Lua land proxying** (see above example).
+
 
 Rules are applied with the priority as its occurrence sequence in the table. In the example above, **api.twitter.com** will match the third rule **api.twitter.com** rather than the fourth **.+.twitter.com**.
 

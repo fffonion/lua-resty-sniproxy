@@ -25,8 +25,13 @@ if not ok or type(new_tab) ~= "function" then
 end
 
 
-local _M = new_tab(0, 4)
+local _M = new_tab(0, 8)
 _M._VERSION = '0.20'
+
+-- flags
+_M.SNI_PROXY_PROTOCOL = 0x1
+_M.SNI_PROXY_PROTOCOL_UPSTREAM = 0x2
+
 _M.rules = nil
 
 local mt = { __index = _M }
@@ -72,11 +77,11 @@ local function _parse_tls_header(sock, is_preread)
     end
 
     local dt_read
-    
+
     -- parse TLS header starts
-    
+
     -- hex_dump(dt_overhead)
-    
+
     if (bit.band(byte(dt_overhead, 1), 0x80) > 0 and byte(dt_overhead, 3) == 1) then
         return nil, nil, "Received SSL 2.0 Client Hello which can not support SNI."
     end
@@ -94,7 +99,7 @@ local function _parse_tls_header(sock, is_preread)
 
     -- protocol: TLS record length 
     local data_len = lshift(byte(dt_overhead, 4), 8) + byte(dt_overhead, 5)
-    
+
     if data_len > TLS_HEADER_MAX_LENGHTH then
         return nil, nil, format("TLS ClientHello exceeds max length configured %d > %d", data_len, TLS_HEADER_MAX_LENGHTH)
     end
@@ -117,11 +122,11 @@ local function _parse_tls_header(sock, is_preread)
     if err then
         return nil, nil, "error reading from reqsock: " .. err
     end
-    
+
     -- hex_dump(dt_record)
-    
+
     local pos = 1
-    
+
     if (byte(dt_record, 1) ~= TLS_HANDSHAKE_TYPE_CLIENT_HELLO) then
         return nil, nil, "Not a client hello"
     end
@@ -168,18 +173,18 @@ local function _parse_tls_header(sock, is_preread)
     len = lshift(byte(dt_record, pos), 8) + byte(dt_record, pos + 1)
     pos = pos + 2;
 
-    
+
     if (pos + len - 1 > data_len) then
         return nil, nil, "Protocol error: Extensions headers"
     end
-    
-    
+
+
     -- Parse each 4 bytes for the extension header
 
     while (pos + 3 <= data_len) do
         -- Extension Length */
         len = lshift(byte(dt_record, pos + 2), 8) + byte(dt_record, pos + 3)
-        
+ 
         -- Check if it's a server name extension */
         if (byte(dt_record, pos) == 0 and byte(dt_record, pos + 1) == 0) then
             -- There can be only one extension of each type,
@@ -188,12 +193,12 @@ local function _parse_tls_header(sock, is_preread)
                 return nil, nil, "Protocol error: Extension type"
             end
             pos = pos + 6 -- skip extension header(4) + server name list length(2)
-            
+
             -- starts parse server name extension
             while (pos + 3 < data_len) do
                 ngx.log(ngx.INFO, "pos is now", string.format("0x%0X", pos-1))
                 len = lshift(byte(dt_record, pos + 1), 8) + byte(dt_record, pos + 2)
-                
+
                 if (pos + 2 + len > data_len) then
                     return nil, nil, "Protocol error: Extension data"
                 end
@@ -206,7 +211,7 @@ local function _parse_tls_header(sock, is_preread)
                 end
                 pos = pos + 3 + len;
             end
-            
+
             --[[ Check we ended where we expected to */
             if (pos ~= data_len)
                 return -5;
@@ -217,7 +222,7 @@ local function _parse_tls_header(sock, is_preread)
         end
         pos = pos + 4 + len -- Advance to the next extension header
     end
-    
+
     --[[Check we ended where we expected to
     if (pos ~= data_len)
         return -5;
@@ -227,7 +232,7 @@ local function _parse_tls_header(sock, is_preread)
 end
 
 local function _select_upstream(server_name)
-    local upstream, port
+    local upstream, port, flags
     if not server_name then -- no sni extension, only match default rule
         server_name = "."
     end
@@ -236,10 +241,11 @@ local function _select_upstream(server_name)
         if m then
             upstream = v[2] or server_name
             port = v[3] or 443
+            flags = v[4] or 0
             break
         end
     end
-    return upstream, port, nil
+    return upstream, port, flags, nil
 end
 
 function _M.preread_by(self)
@@ -254,7 +260,7 @@ function _M.preread_by(self)
     end
     ngx.log(ngx.INFO, "tls server_name: ", server_name)
 
-    local upstream, port = _select_upstream(server_name)
+    local upstream, port, _ = _select_upstream(server_name)
     if upstream:sub(1, 5) ~= "unix:" then
         upstream = upstream .. ":" .. tostring(port)
     end
@@ -278,7 +284,7 @@ local function _upl(self)
         if not buf then
             break
         end
-        
+  
         ssock:send(hd)
         discard, err = ssock:send(buf)
         if err then
@@ -302,13 +308,18 @@ local function _dwn(self)
         if not buf then
             break
         end
-        
+
         rsock:send(hd)
         discard, err = rsock:send(buf)
         if err then
             break
         end
     end
+end
+
+local function inet_pton(addr)
+    local family, binary
+    return family, binary
 end
 
 function _M.content_by(self)
@@ -327,7 +338,7 @@ function _M.content_by(self)
         end
         ngx.log(ngx.INFO, "tls server_name: ", server_name)
 
-        local upstream, port = _select_upstream(server_name)
+        local upstream, port, flags = _select_upstream(server_name)
 
         if not upstream or not port then
             ngx.log(ngx.WARN, "no entries matching server_name: ", server_name)
@@ -339,14 +350,44 @@ function _M.content_by(self)
             ngx.log(ngx.ERR, format("failed to connect to proxy upstream: %s:%s, err:%s", server_name, port, err))
             break
         end
-        -- send tls headers 
+
+        -- send proxy protocol handshake (v1)
+        if bit.band(flags, _M.SNI_PROXY_PROTOCOL_UPSTREAM) > 0 then
+            local addr, port
+            if bit.band(flags, _M.SNI_PROXY_PROTOCOL) > 0 then
+                addr = ngx.var.proxy_protocol_addr
+                port = ngx.var.proxy_protocol_port
+            else
+                addr = ngx.var.remote_addr
+                port = ngx.var.remote_port
+            end
+            if #addr == 0 then -- unix domain?
+                self.srvsock:send("PROXY UNKNOWN\r\n")
+            else
+                local typ
+                if #addr > 4 then
+                    typ = "TCP6"
+                else
+                    typ = "TCP4"
+                end
+                self.srvsock:send(string.format("PROXY %s %s %s %s %s\r\n",
+                    typ,
+                    addr,
+                    ngx.var.server_addr,
+                    port,
+                    ngx.var.server_port
+                ))
+            end
+        end
+
+        -- send tls headers
         self.srvsock:send(header)
-        
+
         local co_upl = spawn(_upl, self)
         local co_dwn = spawn(_dwn, self)
         wait(co_upl)
         wait(co_dwn)
-        
+
         break
     end
 
@@ -366,7 +407,7 @@ function _M.content_by(self)
             end
         end
     end
-    
+
     if reqsock ~= nil then
         if reqsock.shutdown then
             reqsock:shutdown("send")
@@ -378,7 +419,7 @@ function _M.content_by(self)
             end
         end
     end
-    
+
 end
 
 -- backward compatibility
