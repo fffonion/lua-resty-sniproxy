@@ -365,17 +365,23 @@ function _M.content_by(self)
                 self.srvsock:send("PROXY UNKNOWN\r\n")
             else
                 local typ
-                if #addr > 4 then
+                if string.sub(addr, 1, 5) ~= "unix:" and string.find(addr, ":") then
                     typ = "TCP6"
                 else
                     typ = "TCP4"
                 end
+                local srv_addr = ngx.var.server_addr
+                local srv_port = ngx.var.server_port
+                if string.sub(srv_addr, 1, 5) == "unix:" then
+                    srv_addr = "127.0.0.1"
+                    srv_port = 0
+                end
                 self.srvsock:send(string.format("PROXY %s %s %s %s %s\r\n",
                     typ,
                     addr,
-                    ngx.var.server_addr,
+		            srv_addr,
                     port,
-                    ngx.var.server_port
+		            srv_port
                 ))
             end
         end
