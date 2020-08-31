@@ -59,7 +59,7 @@ stream {
 
             resolver 8.8.8.8;
 
-            prepread_by_lua_block {
+            preread_by_lua_block {
                     local sni = require("resty.sniproxy")
                     local sp = sni:new()
                     sp:preread_by()
