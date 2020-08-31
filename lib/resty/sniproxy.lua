@@ -26,7 +26,7 @@ end
 
 
 local _M = new_tab(0, 8)
-_M._VERSION = '0.21'
+_M._VERSION = '0.22'
 
 -- flags
 _M.SNI_PROXY_PROTOCOL = 0x1
